@@ -94,12 +94,82 @@ public class MainActivity extends AppCompatActivity {
                 onMyInfo();
             }
         });
+
+        btn = (Button)findViewById(R.id.btn_post);
+        btn.setOnClickListener(new View.OnClickListener(){
+            @Override
+            public void onClick(View v) {
+                onPost();
+            }
+        });
     }
 
 
     @OnClick(R.id.btn_post)
     public void onPost(){
+        if (isLogin()) {
+            AccessToken token = AccessToken.getCurrentAccessToken();
+            if (token.getPermissions().contains("user_posts")) {
+                new MyPostTask().execute();
+                return;
+            }
+        }
+        mLoginManager.registerCallback(callbackManager, new FacebookCallback<LoginResult>() {
+            @Override
+            public void onSuccess(LoginResult loginResult) {
+                onPost();
+            }
 
+            @Override
+            public void onCancel() {
+
+            }
+
+            @Override
+            public void onError(FacebookException error) {
+
+            }
+        });
+        mLoginManager.logInWithReadPermissions(this, Arrays.asList("user_posts"));
+    }
+
+    private static final String SERVER = "https://graph.facebook.com";
+    private static final String MY_POST = SERVER+"/v2.6/me/feed?access_token=%s";
+    class MyPostTask extends AsyncTask<String,Integer, String> {
+        @Override
+        protected String doInBackground(String... params) {
+            AccessToken token = AccessToken.getCurrentAccessToken();
+            try {
+
+                URL url = new URL(String.format(MY_POST,token.getToken()));
+                HttpURLConnection conn = (HttpURLConnection)url.openConnection();
+                int code = conn.getResponseCode();
+                if (code >= 200 && code < 300) {
+                    BufferedReader br = new BufferedReader(new InputStreamReader(conn.getInputStream()));
+                    String line;
+                    StringBuilder sb = new StringBuilder();
+                    while((line=br.readLine()) != null) {
+                        sb.append(line).append("\n\r");
+                    }
+                    return sb.toString();
+                }
+            } catch (MalformedURLException e) {
+                e.printStackTrace();
+            } catch (IOException e) {
+                e.printStackTrace();
+            }
+            return null;
+        }
+
+        @Override
+        protected void onPostExecute(String s) {
+            super.onPostExecute(s);
+            if (s != null) {
+                Toast.makeText(MainActivity.this, "info : " + s , Toast.LENGTH_SHORT).show();
+            } else {
+                Toast.makeText(MainActivity.this, "error", Toast.LENGTH_SHORT).show();
+            }
+        }
     }
 
     @OnClick(R.id.btn_my_info)
@@ -110,7 +180,6 @@ public class MainActivity extends AppCompatActivity {
     }
 
 
-    private static final String SERVER = "https://graph.facebook.com";
     private static final String MY_INFO = SERVER+"/v2.6/me?fields=id,name,email&access_token=%s";
 
     class MyFacebookInfoTask extends AsyncTask<String, Integer, String> {
